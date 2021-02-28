@@ -2,7 +2,7 @@ use crate::channel::{Either, Msg, Transport};
 use anyhow::anyhow;
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Crossbeam;
 
 impl Transport for Crossbeam {

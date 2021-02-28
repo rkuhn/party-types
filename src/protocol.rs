@@ -1,5 +1,5 @@
 use crate::{
-    channel::{Either, Transport},
+    channel::{AsyncTransport, Either, Transport},
     Channel,
 };
 use anyhow::{bail, Result};
@@ -13,6 +13,13 @@ pub struct Tx<Role, T, Cont> {
 impl<Role, T: Send + 'static, Cont> Tx<Role, T, Cont> {
     pub fn send<Tr: Transport>(self, channel: &mut Channel<Role, Tr>, value: T) -> Result<Cont> {
         channel.send(self, value)
+    }
+    pub async fn send_async<Tr: AsyncTransport>(
+        self,
+        channel: &mut Channel<Role, Tr>,
+        value: T,
+    ) -> Result<Cont> {
+        channel.send_async(self, value).await
     }
 }
 impl<Role, T, Cont: Default> Default for Tx<Role, T, Cont> {
@@ -32,6 +39,12 @@ pub struct Rx<Role, T, Cont> {
 impl<Role, T: Debug + 'static, Cont> Rx<Role, T, Cont> {
     pub fn recv<Tr: Transport>(self, channel: &mut Channel<Role, Tr>) -> Result<(T, Cont)> {
         channel.recv(self)
+    }
+    pub async fn recv_async<Tr: AsyncTransport>(
+        self,
+        channel: &mut Channel<Role, Tr>,
+    ) -> Result<(T, Cont)> {
+        channel.recv_async(self).await
     }
 }
 impl<Role, T, Cont: Default> Default for Rx<Role, T, Cont> {
@@ -87,18 +100,78 @@ impl<Role1, T1: 'static, Cont1, Role2, T2: 'static, Cont2>
         Ok(match c1.tr.choice(&mut c1.rx, &mut c2.rx)? {
             Either::Left(v) => match v.downcast::<T1>() {
                 Ok(v) => ChoiceResult::One(*v, self.one),
-                Err(v) => bail!("got unexpected message {:?}", v),
+                Err(_v) => bail!("got unexpected message"),
             },
             Either::Right(v) => match v.downcast::<T2>() {
                 Ok(v) => ChoiceResult::Two(*v, self.two),
-                Err(v) => bail!("got unexpected message {:?}", v),
+                Err(_v) => bail!("got unexpected message"),
             },
             Either::Both(v) => match v.downcast::<T1>() {
                 Ok(v) => ChoiceResult::One(*v, self.one),
                 Err(v) => match v.downcast::<T2>() {
                     Ok(v) => ChoiceResult::Two(*v, self.two),
-                    Err(v) => bail!("got unexpected message {:?}", v),
+                    Err(_v) => bail!("got unexpected message"),
                 },
+            },
+        })
+    }
+
+    pub async fn recv_async<Tr: Transport>(
+        self,
+        c1: &mut Channel<Role1, Tr>,
+        c2: &mut Channel<Role2, Tr>,
+    ) -> Result<ChoiceResult<T1, Cont1, T2, Cont2>>
+    where
+        Tr: AsyncTransport,
+    {
+        Ok(match c1.tr.choice_async(&mut c1.rx, &mut c2.rx).await? {
+            Either::Left(v) => match v.downcast::<T1>() {
+                Ok(v) => ChoiceResult::One(*v, self.one),
+                Err(_v) => bail!("got unexpected message"),
+            },
+            Either::Right(v) => match v.downcast::<T2>() {
+                Ok(v) => ChoiceResult::Two(*v, self.two),
+                Err(_v) => bail!("got unexpected message"),
+            },
+            Either::Both(v) => match v.downcast::<T1>() {
+                Ok(v) => ChoiceResult::One(*v, self.one),
+                Err(v) => match v.downcast::<T2>() {
+                    Ok(v) => ChoiceResult::Two(*v, self.two),
+                    Err(_v) => bail!("got unexpected message"),
+                },
+            },
+        })
+    }
+}
+
+impl<Role, T1: 'static, Cont1, T2: 'static, Cont2> Choice<Role, T1, Cont1, Role, T2, Cont2> {
+    pub fn recv_same<Tr: Transport>(
+        self,
+        channel: &mut Channel<Role, Tr>,
+    ) -> Result<ChoiceResult<T1, Cont1, T2, Cont2>> {
+        let value = channel.tr.recv(&mut channel.rx)?;
+        Ok(match value.downcast::<T1>() {
+            Ok(v) => ChoiceResult::One(*v, self.one),
+            Err(v) => match v.downcast::<T2>() {
+                Ok(v) => ChoiceResult::Two(*v, self.two),
+                Err(_v) => bail!("got unexpected message"),
+            },
+        })
+    }
+
+    pub async fn recv_same_async<Tr: Transport>(
+        self,
+        channel: &mut Channel<Role, Tr>,
+    ) -> Result<ChoiceResult<T1, Cont1, T2, Cont2>>
+    where
+        Tr: AsyncTransport,
+    {
+        let value = channel.tr.recv_async(&mut channel.rx).await?;
+        Ok(match value.downcast::<T1>() {
+            Ok(v) => ChoiceResult::One(*v, self.one),
+            Err(v) => match v.downcast::<T2>() {
+                Ok(v) => ChoiceResult::Two(*v, self.two),
+                Err(_v) => bail!("got unexpected message"),
             },
         })
     }

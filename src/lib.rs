@@ -7,6 +7,9 @@ pub use protocol::{Choice, ChoiceResult, End, Rx, Tx};
 pub mod transports {
     mod crossbeam;
     pub use crossbeam::Crossbeam;
+
+    mod futures;
+    pub use futures::FuturesChannel;
 }
 
 pub fn pair<A, B, Tr: channel::Transport>(tr: &Tr) -> (Channel<B, Tr>, Channel<A, Tr>) {

@@ -8,4 +8,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow="1"
+async-trait = "0.1.42"
 crossbeam-channel="0.5"
+futures-channel = "0.3.13"
+futures-lite = "1.11.3"
