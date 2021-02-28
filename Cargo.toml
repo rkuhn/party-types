@@ -3,6 +3,8 @@ name = "party-types"
 version = "0.1.0"
 authors = ["Roland Kuhn <rk@rkuhn.info>"]
 edition = "2018"
+description = "Implementation of endpoint types suitable for hosting multi-party session type projections"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 anyhow="1"
